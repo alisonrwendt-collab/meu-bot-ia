@@ -16,7 +16,7 @@ app.add_middleware(
 
 llm = ChatGroq(
     temperature=0,
-    model_name="llama3-8b-8192",
+    model_name="openai/gpt-oss-20b",
     groq_api_key=os.environ.get("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")
 )
 

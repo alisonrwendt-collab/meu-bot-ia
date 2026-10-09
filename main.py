@@ -17,7 +17,7 @@ app.add_middleware(
 llm = ChatGroq(
     temperature=0,
     model_name="llama-3.1-8b-instant",
-    groq_api_key=os.environ.get("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")
+    groq_api_key=os.environ.get("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")
 )
 
 search = DuckDuckGoSearchRun()

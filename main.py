@@ -16,7 +16,7 @@ app.add_middleware(
 
 llm = ChatGroq(
     temperature=0,
-    model_name="llama-3.3-70b-versatile",
+    model_name="llama3-70b-8192",
     groq_api_key=os.environ.get("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")
 )
 

@@ -14,56 +14,57 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# TROCANDO O CÉREBRO PARA O MODELO 70B (MUITO MAIS INTELIGENTE E OBEDIENTE)
 llm = ChatGroq(
-    temperature=0,
-    model_name="openai/gpt-oss-20b", 
+    temperature=0.1, # Levemente maior para criatividade, mas ainda preciso
+    model_name="llama-3.3-70b-versatile", 
     groq_api_key=os.environ.get("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")
 )
 
 search = DuckDuckGoSearchRun()
 
 @tool
-def busca_web(query: str) -> str:
-    """USE OBRIGATORIAMENTE para: Notícias atuais, fatos históricos, resultados de futebol e classificações."""
-    return search.invoke(query)
-
-@tool
-def clima(cidade: str) -> str:
-    """USE OBRIGATORIAMENTE para: Previsão do tempo e temperatura de qualquer cidade."""
-    try:
-        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={cidade}&count=1&language=pt&format=json"
-        geo_data = json.loads(urllib.request.urlopen(geo_url).read())
-        if "results" not in geo_data or not geo_data["results"]:
-            return f"Cidade '{cidade}' não encontrada."
-        lat, lon = geo_data["results"][0]["latitude"], geo_data["results"][0]["longitude"]
-        nome_real = geo_data["results"][0]["name"]
-        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
-        weather_data = json.loads(urllib.request.urlopen(weather_url).read())
-        return f"Clima em {nome_real}: {weather_data['current_weather']['temperature']}°C"
-    except Exception as e:
-        return f"Erro no clima: {e}"
-
-@tool
 def cotacao(ativo: str) -> str:
-    """USE OBRIGATORIAMENTE ESTA FERRAMENTA quando o usuário mencionar: dólar, real, euro, bitcoin, criptomoedas, cotação ou valor da moeda."""
+    """Use ESTA FERRAMENTA SEMPRE que o usuário perguntar sobre: dólar, real, euro, bitcoin, criptomoedas, cotação ou valor de qualquer moeda."""
     try:
-        ativo_clean = ativo.upper().strip().replace("DÓLAR", "DOLAR")
-        pares = {"USD": "USD-BRL", "DOLAR": "USD-BRL", "EUR": "EUR-BRL", "EURO": "EUR-BRL", "BTC": "BTC-BRL", "BITCOIN": "BTC-BRL", "ETH": "ETH-BRL"}
+        ativo_clean = ativo.upper().strip().replace("DÓLAR", "DOLAR").replace("REAL", "BRL")
+        pares = {"USD": "USD-BRL", "DOLAR": "USD-BRL", "BRL": "USD-BRL", "EUR": "EUR-BRL", "EURO": "EUR-BRL", "BTC": "BTC-BRL", "BITCOIN": "BTC-BRL", "ETH": "ETH-BRL"}
         par = pares.get(ativo_clean, f"{ativo_clean}-BRL")
         url = f"https://economia.awesomeapi.com.br/last/{par}"
         data = json.loads(urllib.request.urlopen(url).read())
         chave = par.replace("-", "")
-        return f"Cotação de {ativo_clean}: R$ {data[chave]['bid']} (Variação: {data[chave]['pctChange']}%)"
+        return f"A cotação atual de {ativo_clean} é R$ {data[chave]['bid']} (Variação de {data[chave]['pctChange']}% hoje)."
     except Exception as e:
-        return f"Erro ao buscar cotação. Tente usar 'USD', 'EUR' ou 'BTC'."
+        return f"Erro ao buscar cotação. Tente 'USD', 'EUR' ou 'BTC'."
+
+@tool
+def clima(cidade: str) -> str:
+    """Use ESTA FERRAMENTA SEMPRE que o usuário perguntar sobre: tempo, temperatura, chuva ou clima de qualquer cidade."""
+    try:
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={cidade}&count=1&language=pt&format=json"
+        geo_data = json.loads(urllib.request.urlopen(geo_url).read())
+        if "results" not in geo_data or not geo_data["results"]:
+            return f"Não encontrei a cidade '{cidade}'. Tente escrever o nome corretamente."
+        lat, lon = geo_data["results"][0]["latitude"], geo_data["results"][0]["longitude"]
+        nome_real = geo_data["results"][0]["name"]
+        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+        weather_data = json.loads(urllib.request.urlopen(weather_url).read())
+        return f"A temperatura atual em {nome_real} é de {weather_data['current_weather']['temperature']}°C."
+    except Exception as e:
+        return f"Erro ao buscar clima: {e}"
 
 @tool
 def loteria(tipo: str) -> str:
-    """USE OBRIGATORIAMENTE para: Resultados da Mega-Sena, Lotofácil, Quina ou Jogo do Bicho."""
+    """Use ESTA FERRAMENTA SEMPRE que o usuário perguntar sobre: Mega-Sena, Lotofácil, Quina, Jogo do Bicho ou resultados de sorteio."""
     try:
-        return search.invoke(f"ultimo resultado {tipo} sorteio apuração")
+        return search.invoke(f"ultimo resultado {tipo} sorteio apuração oficial")
     except Exception as e:
         return f"Erro ao buscar loteria: {e}"
+
+@tool
+def busca_web(query: str) -> str:
+    """Use ESTA FERRAMENTA SEMPRE que o usuário perguntar sobre: futebol, notícias, fatos históricos ou qualquer informação que não seja clima, cotação ou loteria."""
+    return search.invoke(query)
 
 board = chess.Board()
 try:
@@ -73,12 +74,12 @@ except:
 
 @tool
 def xadrez(move: str) -> str:
-    """USE OBRIGATORIAMENTE para: Jogar xadrez. Recebe lances como 'e4', 'Nf3', 'O-O'."""
+    """Use ESTA FERRAMENTA para jogar xadrez. Recebe lances como 'e4', 'Nf3', 'O-O'."""
     global board, engine
     try:
         board.push_san(move)
         if board.is_game_over():
-            res = f"Fim de jogo! {board.result()}"
+            res = f"Fim de jogo! Resultado: {board.result()}"
             board.reset()
             return res
         bot_move = engine.play(board, chess.engine.Limit(time=0.5)).move if engine else list(board.legal_moves)[0]
@@ -89,7 +90,7 @@ def xadrez(move: str) -> str:
 
 @tool
 def radio(nome: str) -> str:
-    """USE OBRIGATORIAMENTE para: Tocar rádios ao vivo (Jovem Pan, CBN, Antena 1)."""
+    """Use ESTA FERRAMENTA para tocar rádios ao vivo (Jovem Pan, CBN, Antena 1)."""
     radios = {"jovem pan": "https://stream.zeno.fm/yn65fsaurfhvv", "cbn": "https://n008a-eu.rcs.revma.com/ypqt40u0x1zuv", "antena 1": "https://antena1.stream.com.br/antena1"}
     for k, v in radios.items():
         if k in nome.lower(): return f"LINK_RADIO_ENCONTRADO:{nome}:{v}"
@@ -98,11 +99,12 @@ def radio(nome: str) -> str:
 
 @tool
 def youtube(musica: str) -> str:
-    """USE OBRIGATORIAMENTE para: Tocar músicas, bandas ou clipes no YouTube."""
+    """Use ESTA FERRAMENTA para tocar músicas, bandas ou clipes no YouTube."""
     links = re.findall(r'(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})', search.invoke(f"site:youtube.com {musica}"))
     return f"LINK_YOUTUBE_ENCONTRADO:{musica}:{links[0]}" if links else f"Não achei '{musica}' no YouTube."
 
-llm_with_tools = llm.bind_tools([busca_web, clima, cotacao, loteria, xadrez, radio, youtube])
+# Vincula as ferramentas ao modelo 70B
+llm_with_tools = llm.bind_tools([cotacao, clima, loteria, busca_web, xadrez, radio, youtube])
 
 class Msg(BaseModel):
     message: str
@@ -110,13 +112,8 @@ class Msg(BaseModel):
 @app.post("/chat")
 async def chat(req: Msg):
     try:
-        system_prompt = """Você é um assistente que USA FERRAMENTAS para tudo. 
-        REGRAS ABSOLUTAS (NUNCA QUEBRE):
-        1. Se o usuário falar em DÓLAR, REAL, EURO, BITCOIN ou COTAÇÃO, você DEVE usar a ferramenta `cotacao`. NUNCA diga que não tem acesso a dados.
-        2. Se falar em CLIMA, use `clima`.
-        3. Se falar em LOTERIA ou JOGO DO BICHO, use `loteria`.
-        4. Se falar em FUTEBOL ou NOTÍCIAS, use `busca_web`.
-        NUNCA invente dados. Use a ferramenta correta."""
+        # Prompt curto, direto e sem contradições
+        system_prompt = "Você é um assistente útil. USE AS FERRAMENTAS fornecidas para responder. NUNCA diga que não sabe ou que não tem acesso a dados. Se a pergunta for sobre moedas, use 'cotacao'. Se for sobre tempo, use 'clima'."
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -131,16 +128,15 @@ async def chat(req: Msg):
             args = tool_call['args']
             
             tools_map = {
-                "busca_web": busca_web, "clima": clima, "cotacao": cotacao,
-                "loteria": loteria, "xadrez": xadrez, "radio": radio, "youtube": youtube
+                "cotacao": cotacao, "clima": clima, "loteria": loteria, 
+                "busca_web": busca_web, "xadrez": xadrez, "radio": radio, "youtube": youtube
             }
             
-            # CORREÇÃO AQUI: Usar .invoke() em vez de chamar como função normal
             tool_func = tools_map.get(name)
             if tool_func:
                 result = tool_func.invoke(args)
             else:
-                result = "Ferramenta desconhecida."
+                result = "Ferramenta não encontrada."
             
             messages.append(response)
             messages.append({"role": "tool", "content": str(result), "tool_call_id": tool_call['id']})

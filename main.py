@@ -17,7 +17,7 @@ app.add_middleware(
 # TROCANDO O CÉREBRO PARA O MODELO 70B (MUITO MAIS INTELIGENTE E OBEDIENTE)
 llm = ChatGroq(
     temperature=0.1, # Levemente maior para criatividade, mas ainda preciso
-    model_name="llama-3.3-70b-versatile", 
+    model_name="openai/gpt-oss-120b", 
     groq_api_key=os.environ.get("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")
 )
 

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from langchain_groq import ChatGroq
 from langchain_core.tools import tool
 from langchain_community.tools import DuckDuckGoSearchRun
-import os, urllib.request, json
+import os, chess, chess.engine, urllib.request, json, re
 
 app = FastAPI()
 app.add_middleware(
@@ -14,10 +14,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# MODELO ESTÁVEL COM SUPORTE NATIVO A FERRAMENTAS NA GROQ
+# MODELO OFICIAL DA GROQ COM SUPORTE COMPROVADO E ESTÁVEL A FERRAMENTAS
 llm = ChatGroq(
-    temperature=0.1,
-    model_name="qwen/qwen3.8-27b", 
+    temperature=0.0,
+    model_name="llama-3.1-8b-instant", 
     groq_api_key=os.environ.get("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")
 )
 
@@ -25,7 +25,7 @@ search = DuckDuckGoSearchRun()
 
 @tool
 def cotacao(ativo: str) -> str:
-    """Use ESTA FERRAMENTA para saber o valor de moedas (dólar, euro) ou criptomoedas (bitcoin). Exemplo de ativo: 'USD', 'EUR', 'BTC'."""
+    """Use PARA SABER o valor de moedas (dólar, euro) ou criptomoedas (bitcoin). Ex: 'USD', 'EUR', 'BTC'."""
     try:
         ativo_clean = ativo.upper().strip().replace("DÓLAR", "USD").replace("REAL", "BRL")
         pares = {"USD": "USD-BRL", "EUR": "EUR-BRL", "BTC": "BTC-BRL", "ETH": "ETH-BRL"}
@@ -35,11 +35,11 @@ def cotacao(ativo: str) -> str:
         chave = par.replace("-", "")
         return f"A cotação atual de {ativo_clean} é R$ {data[chave]['bid']} (Variação: {data[chave]['pctChange']}%)."
     except Exception as e:
-        return f"Erro ao buscar cotação. Tente 'USD', 'EUR' ou 'BTC'."
+        return f"Erro ao buscar cotação."
 
 @tool
 def clima(cidade: str) -> str:
-    """Use ESTA FERRAMENTA para saber a temperatura e previsão do tempo de qualquer cidade."""
+    """Use PARA SABER a temperatura e previsão do tempo de qualquer cidade."""
     try:
         geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={cidade}&count=1&language=pt&format=json"
         geo_data = json.loads(urllib.request.urlopen(geo_url).read())
@@ -51,23 +51,67 @@ def clima(cidade: str) -> str:
         weather_data = json.loads(urllib.request.urlopen(weather_url).read())
         return f"A temperatura atual em {nome_real} é de {weather_data['current_weather']['temperature']}°C."
     except Exception as e:
-        return f"Erro ao buscar clima: {e}"
+        return f"Erro ao buscar clima."
 
 @tool
 def loteria(tipo: str) -> str:
-    """Use ESTA FERRAMENTA para saber resultados da Mega-Sena, Lotofácil, Quina ou Jogo do Bicho."""
+    """Use PARA SABER resultados da Mega-Sena, Lotofácil, Quina ou Jogo do Bicho."""
     try:
         return search.invoke(f"ultimo resultado {tipo} sorteio apuração oficial")
     except Exception as e:
-        return f"Erro ao buscar loteria: {e}"
+        return f"Erro ao buscar loteria."
 
 @tool
 def busca_web(query: str) -> str:
-    """Use ESTA FERRAMENTA para notícias, futebol, fatos históricos ou qualquer informação geral da internet."""
+    """Use PARA notícias, futebol, fatos históricos ou qualquer informação geral da internet."""
     return search.invoke(query)
 
-# Vincula apenas as ferramentas essenciais e estáveis
-llm_with_tools = llm.bind_tools([cotacao, clima, loteria, busca_web])
+@tool
+def xadrez(move: str) -> str:
+    """Use PARA JOGAR xadrez. Recebe lances como 'e4', 'Nf3', 'O-O'."""
+    global board, engine
+    try:
+        board.push_san(move)
+        if board.is_game_over():
+            res = f"Fim de jogo! Resultado: {board.result()}"
+            board.reset()
+            return res
+        bot_move = engine.play(board, chess.engine.Limit(time=0.5)).move if engine else list(board.legal_moves)[0]
+        board.push(bot_move)
+        return f"Você jogou {move}. Eu respondi com {bot_move.uci()}. Sua vez!"
+    except Exception as e:
+        return f"Lance inválido. Tente 'e4' ou 'Nf3'."
+
+# Inicializa o tabuleiro global
+board = chess.Board()
+try:
+    engine = chess.engine.SimpleEngine.popen_uci("stockfish")
+except:
+    engine = None
+
+@tool
+def radio(nome: str) -> str:
+    """Use PARA TOCAR rádios ao vivo (Jovem Pan, CBN, Antena 1)."""
+    radios = {
+        "jovem pan": "https://stream.zeno.fm/yn65fsaurfhvv", 
+        "cbn": "https://n008a-eu.rcs.revma.com/ypqt40u0x1zuv", 
+        "antena 1": "https://antena1.stream.com.br/antena1"
+    }
+    for k, v in radios.items():
+        if k in nome.lower(): 
+            return f"LINK_RADIO_ENCONTRADO:{nome}:{v}"
+    links = re.findall(r'https?://\S+', search.invoke(f"stream ao vivo rádio {nome} .mp3 OR .m3u8"))
+    return f"LINK_RADIO_ENCONTRADO:{nome}:{links[0]}" if links else f"Rádio {nome} não encontrada."
+
+@tool
+def youtube(musica: str) -> str:
+    """Use PARA TOCAR músicas, bandas ou clipes no YouTube."""
+    links = re.findall(r'(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})', search.invoke(f"site:youtube.com {musica}"))
+    return f"LINK_YOUTUBE_ENCONTRADO:{musica}:{links[0]}" if links else f"Não achei '{musica}' no YouTube."
+
+# Vincula TODAS as ferramentas ao modelo
+tools = [cotacao, clima, loteria, busca_web, xadrez, radio, youtube]
+llm_with_tools = llm.bind_tools(tools)
 
 class Msg(BaseModel):
     message: str
@@ -75,7 +119,8 @@ class Msg(BaseModel):
 @app.post("/chat")
 async def chat(req: Msg):
     try:
-        system_prompt = "Você é um assistente útil e direto. USE AS FERRAMENTAS fornecidas para responder perguntas sobre cotação, clima, loteria ou notícias. NUNCA diga que não sabe ou que não tem acesso a dados. Se a pergunta for sobre moedas, use 'cotacao'. Se for sobre tempo, use 'clima'."
+        # Prompt EXTREMAMENTE DIRETO para forçar o uso de ferramentas
+        system_prompt = "VOCÊ É UM ASSISTENTE QUE USA FERRAMENTAS. SE O USUÁRIO PEDIR PARA TOCAR MÚSICA, RÁDIO, JOGAR XADREZ, SABER COTAÇÃO, CLIMA, LOTERIA OU NOTÍCIAS, VOCÊ DEVE USAR A FERRAMENTA CORRESPONDENTE. NUNCA DIGA QUE NÃO PODE FAZER. USE A FERRAMENTA."
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -90,7 +135,8 @@ async def chat(req: Msg):
             args = tool_call['args']
             
             tools_map = {
-                "cotacao": cotacao, "clima": clima, "loteria": loteria, "busca_web": busca_web
+                "cotacao": cotacao, "clima": clima, "loteria": loteria, 
+                "busca_web": busca_web, "xadrez": xadrez, "radio": radio, "youtube": youtube
             }
             
             tool_func = tools_map.get(name)

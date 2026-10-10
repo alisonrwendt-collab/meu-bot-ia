@@ -17,7 +17,7 @@ app.add_middleware(
 # MODELO ESTÁVEL COM SUPORTE NATIVO A FERRAMENTAS NA GROQ
 llm = ChatGroq(
     temperature=0.1,
-    model_name="qwen/qwen3.8-27b, 
+    model_name="qwen/qwen3.8-27b", 
     groq_api_key=os.environ.get("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")
 )
 

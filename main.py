@@ -25,7 +25,7 @@ search = DuckDuckGoSearchRun()
 @tool
 def busca_web(query: str) -> str:
     """USE OBRIGATORIAMENTE para: Notícias atuais, fatos históricos, resultados de futebol e classificações."""
-    return search.run(query)
+    return search.invoke(query)
 
 @tool
 def clima(cidade: str) -> str:
@@ -45,7 +45,7 @@ def clima(cidade: str) -> str:
 
 @tool
 def cotacao(ativo: str) -> str:
-    """USE OBRIGATORIAMENTE ESTA FERRAMENTA quando o usuário mencionar: dólar, real, euro, bitcoin, criptomoedas, cotação ou valor da moeda. O argumento 'ativo' deve ser a moeda (ex: 'USD', 'BTC', 'Dolar', 'Euro')."""
+    """USE OBRIGATORIAMENTE ESTA FERRAMENTA quando o usuário mencionar: dólar, real, euro, bitcoin, criptomoedas, cotação ou valor da moeda."""
     try:
         ativo_clean = ativo.upper().strip().replace("DÓLAR", "DOLAR")
         pares = {"USD": "USD-BRL", "DOLAR": "USD-BRL", "EUR": "EUR-BRL", "EURO": "EUR-BRL", "BTC": "BTC-BRL", "BITCOIN": "BTC-BRL", "ETH": "ETH-BRL"}
@@ -61,7 +61,7 @@ def cotacao(ativo: str) -> str:
 def loteria(tipo: str) -> str:
     """USE OBRIGATORIAMENTE para: Resultados da Mega-Sena, Lotofácil, Quina ou Jogo do Bicho."""
     try:
-        return search.run(f"ultimo resultado {tipo} sorteio apuração")
+        return search.invoke(f"ultimo resultado {tipo} sorteio apuração")
     except Exception as e:
         return f"Erro ao buscar loteria: {e}"
 
@@ -93,13 +93,13 @@ def radio(nome: str) -> str:
     radios = {"jovem pan": "https://stream.zeno.fm/yn65fsaurfhvv", "cbn": "https://n008a-eu.rcs.revma.com/ypqt40u0x1zuv", "antena 1": "https://antena1.stream.com.br/antena1"}
     for k, v in radios.items():
         if k in nome.lower(): return f"LINK_RADIO_ENCONTRADO:{nome}:{v}"
-    links = re.findall(r'https?://\S+', search.run(f"stream ao vivo rádio {nome} .mp3 OR .m3u8"))
+    links = re.findall(r'https?://\S+', search.invoke(f"stream ao vivo rádio {nome} .mp3 OR .m3u8"))
     return f"LINK_RADIO_ENCONTRADO:{nome}:{links[0]}" if links else f"Rádio {nome} não encontrada."
 
 @tool
 def youtube(musica: str) -> str:
     """USE OBRIGATORIAMENTE para: Tocar músicas, bandas ou clipes no YouTube."""
-    links = re.findall(r'(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})', search.run(f"site:youtube.com {musica}"))
+    links = re.findall(r'(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})', search.invoke(f"site:youtube.com {musica}"))
     return f"LINK_YOUTUBE_ENCONTRADO:{musica}:{links[0]}" if links else f"Não achei '{musica}' no YouTube."
 
 llm_with_tools = llm.bind_tools([busca_web, clima, cotacao, loteria, xadrez, radio, youtube])
@@ -110,10 +110,9 @@ class Msg(BaseModel):
 @app.post("/chat")
 async def chat(req: Msg):
     try:
-        # PROMPT RÍGIDO QUE PROÍBE O BOT DE DIZER QUE "NÃO SABE"
         system_prompt = """Você é um assistente que USA FERRAMENTAS para tudo. 
         REGRAS ABSOLUTAS (NUNCA QUEBRE):
-        1. Se o usuário falar em DÓLAR, REAL, EURO, BITCOIN ou COTAÇÃO, você DEVE usar a ferramenta `cotacao`. NUNCA diga que não tem acesso a dados em tempo real.
+        1. Se o usuário falar em DÓLAR, REAL, EURO, BITCOIN ou COTAÇÃO, você DEVE usar a ferramenta `cotacao`. NUNCA diga que não tem acesso a dados.
         2. Se falar em CLIMA, use `clima`.
         3. Se falar em LOTERIA ou JOGO DO BICHO, use `loteria`.
         4. Se falar em FUTEBOL ou NOTÍCIAS, use `busca_web`.
@@ -136,9 +135,12 @@ async def chat(req: Msg):
                 "loteria": loteria, "xadrez": xadrez, "radio": radio, "youtube": youtube
             }
             
-            # Executa a ferramenta de forma segura
-            tool_func = tools_map.get(name, lambda x: "Ferramenta desconhecida")
-            result = tool_func(args)
+            # CORREÇÃO AQUI: Usar .invoke() em vez de chamar como função normal
+            tool_func = tools_map.get(name)
+            if tool_func:
+                result = tool_func.invoke(args)
+            else:
+                result = "Ferramenta desconhecida."
             
             messages.append(response)
             messages.append({"role": "tool", "content": str(result), "tool_call_id": tool_call['id']})

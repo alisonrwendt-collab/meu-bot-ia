@@ -18,7 +18,7 @@ app.add_middleware(
 llm = ChatGroq(
     temperature=0.0,
     model_name="openai/gpt-oss-120b", 
-    groq_api_key=os.environ.get("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")
+    groq_api_key=os.environ.get("GROQ_API_KEY")
 )
 
 search = DuckDuckGoSearchRun()
